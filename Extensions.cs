@@ -1,19 +1,13 @@
-﻿using IoTSharp.MqttSdk;
-using Microsoft.Extensions.Configuration;
-using MQTTnet;
+﻿using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Protocol;
+using System.Threading.Tasks;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
     public static class IoTSharpServiceCollectionExtensions
     {
-        public static IServiceCollection AddIoTSharpMqttSdk(this IServiceCollection services, IConfiguration configuration)
-        {
-            return services.AddSingleton<MQTTClient>()
-                        .Configure<MqttSettings>(configuration)
-                .AddHostedService<MqttClientHost>();
-        }
+      
 
         public static Task<MqttClientPublishResult> PublishAsync(this IMqttClient client,string topic, string playload, MqttQualityOfServiceLevel mqttQualityOf)
         {

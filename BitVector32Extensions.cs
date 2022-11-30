@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace System.Collections.Specialized
 {
@@ -51,7 +53,7 @@ namespace System.Collections.Specialized
 
         public static  Dictionary<string,int> ToDictionary(this BitVector32 vector32,Dictionary<string,short> secs)
         {
-            Dictionary<string, int >  warn = new();
+            Dictionary<string, int >  warn = new Dictionary<string, int> ();
             List<(string pi, BitSectionAttribute bsa)> pairs = new List<(string pi, BitSectionAttribute bsa)> ();
             secs.Keys.ToList().ForEach(p =>
             {
@@ -79,9 +81,9 @@ namespace System.Collections.Specialized
             }
             return warn;
         }
-        public static T? To<T>(this BitVector32 vector32) where T : class, new()
+        public static T To<T>(this BitVector32 vector32) where T : class, new()
         {
-            T? warn = new();
+            T warn = default;
             List<(PropertyInfo pi, BitSectionAttribute bsa)> pairs = new List<(PropertyInfo pi, BitSectionAttribute bsa)>();
             warn?.GetType().GetProperties().ToList().ForEach(p =>
             {

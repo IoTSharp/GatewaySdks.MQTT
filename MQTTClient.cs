@@ -9,6 +9,7 @@ using MQTTnet.Diagnostics;
 using MQTTnet.Protocol;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -55,7 +56,7 @@ namespace IoTSharp.MqttSdk
             _logger = logger;
         }
 
-        private void MQTTClient_OnReceiveAttributes(object? sender, AttributeResponse e)
+        private void MQTTClient_OnReceiveAttributes(object sender, AttributeResponse e)
         {
             switch (e.KeyName)
             {
@@ -272,9 +273,9 @@ namespace IoTSharp.MqttSdk
 
         public Task UploadAttributeAsync(string _devicename, object obj)
         {
-            return Client.PublishAsync($"devices/{_devicename}/attributes", Newtonsoft.Json.JsonConvert.SerializeObject(obj));
+            return Client.PublishAsync($"devices/{_devicename}/attributes", JsonSerializer.Serialize(obj));
         }
-        public Task UploadAttributeAsync(string _devicename,  Newtonsoft.Json.Linq.JObject jo)
+        public Task UploadAttributeAsync(string _devicename, JsonDocument jo)
         {
             return Client.PublishAsync($"devices/{_devicename}/attributes", jo.ToString());
         }
@@ -282,17 +283,17 @@ namespace IoTSharp.MqttSdk
 
         public Task UploadTelemetryDataAsync(string _devicename, object obj)
         {
-            return Client.PublishAsync($"devices/{_devicename}/telemetry", Newtonsoft.Json.JsonConvert.SerializeObject(obj));
+            return Client.PublishAsync($"devices/{_devicename}/telemetry", JsonSerializer.Serialize(obj));
         }
         public Task UploadDeviceStatusAsync(string _devicename, bool online)
         {
-            return Client.PublishAsync($"devices/{_devicename}/status/{(online ? "online" : "offline")}", Newtonsoft.Json.JsonConvert.SerializeObject(new { online }));
+            return Client.PublishAsync($"devices/{_devicename}/status/{(online ? "online" : "offline")}", JsonSerializer.Serialize(new { online }));
         }
         public Task ResponseExecommand(RpcResponse rpcResult)
         {
             ///IoTSharp/Clients/RpcClient.cs#L65     var responseTopic = $"/devices/{deviceid}/rpc/response/{methodName}/{rpcid}";
             string topic = $"devices/{rpcResult.DeviceId}/rpc/response/{rpcResult.Method.ToString()}/{rpcResult.ResponseId}";
-            return Client.PublishAsync(  topic,   Newtonsoft.Json.JsonConvert.SerializeObject(rpcResult.Data) , MqttQualityOfServiceLevel.ExactlyOnce );
+            return Client.PublishAsync(  topic, JsonSerializer.Serialize(rpcResult.Data) , MqttQualityOfServiceLevel.ExactlyOnce );
         }
         public Task RequestExecommand(RpcRequest rpcRequest)
         {
@@ -311,7 +312,7 @@ namespace IoTSharp.MqttSdk
             Dictionary<string, string> keys = new Dictionary<string, string>();
             keys.Add(anySide ? "anySide" : "server", string.Join(",", args));
             Client.SubscribeAsync($"devices/{_device}/attributes/response/{id}", MqttQualityOfServiceLevel.ExactlyOnce);
-            return Client.PublishAsync(topic, Newtonsoft.Json.JsonConvert.SerializeObject(keys), MqttQualityOfServiceLevel.ExactlyOnce);
+            return Client.PublishAsync(topic, JsonSerializer.Serialize(keys), MqttQualityOfServiceLevel.ExactlyOnce);
         }
     }
 
