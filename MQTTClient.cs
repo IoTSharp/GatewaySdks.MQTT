@@ -136,6 +136,8 @@ namespace IoTSharp.MqttSdk
                 {
                     try
                     {
+                        _logger.LogWarning($"CONNECTING FAILED,{e.Reason}-{e.ReasonString}");
+                        Thread.Sleep(TimeSpan.FromSeconds(60));
                         await Client.ConnectAsync(clientOptions);
                     }
                     catch (Exception exception)
