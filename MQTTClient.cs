@@ -26,18 +26,26 @@ namespace IoTSharp.MqttSdk
             this.client = client;
         }
 
-
+        DateTime _lastconnect=DateTime.MinValue;
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             do
             {
-                await Task.Run(async () =>
-              {
-                  if (!client.IsConnected)
-                  {
-                      await client.ConnectAsync();
-                  }
-              });
+                if (!client.IsConnected)
+                {
+                    var ts = DateTime.Now.Subtract(_lastconnect).TotalSeconds;
+                    if (10 < ts && ts < 40)//如果 10到40秒内又重新连接一次， 则更换客户端ID再次登录。 
+                    {
+                        client.ClientId = Guid.NewGuid().ToString();
+                        _lastconnect = DateTime.Now;
+                    }
+                    await client.ConnectAsync();
+                }
+                else
+                {
+                    client.Ping();
+                    await Task.Delay(TimeSpan.FromSeconds(50));
+                }
                 await Task.Delay(TimeSpan.FromSeconds(10));
             } while (!stoppingToken.IsCancellationRequested);
         }
@@ -49,13 +57,19 @@ namespace IoTSharp.MqttSdk
         {
             _settings = options.Value;
             BrokerUri = new Uri(_settings.MqttBroker);
-            DeviceId = _settings.DeviceId;
             OnReceiveAttributes += MQTTClient_OnReceiveAttributes;
            OnExcRpc += Client_OnExcRpc;
             OnConnected += MQTTClient_OnConnected;
             _logger = logger;
         }
-
+        public async void Ping()
+        {
+            if (Client != null)
+            {
+                var ping_ = await Client?.TryPingAsync();
+                _logger.LogInformation($"TryPing {ping_}");
+            }
+        }
         private void MQTTClient_OnReceiveAttributes(object sender, AttributeResponse e)
         {
             switch (e.KeyName)
@@ -83,10 +97,6 @@ namespace IoTSharp.MqttSdk
 
         }
 
-        
-
-        public string DeviceId { get; set; } = string.Empty;
-
         private readonly MqttSettings _settings;
         private readonly ILogger<MQTTClient> _logger;
 
@@ -105,6 +115,31 @@ namespace IoTSharp.MqttSdk
             BrokerUri = uri;
             return await ConnectAsync();
         }
+
+        public string DeviceId => BrokerUri?.PathAndQuery?.Trim('/');
+
+        private string _client_id;
+
+        public string ClientId
+        {
+            get {
+                if (string.IsNullOrEmpty(_client_id))
+                {
+                    var st = DeviceId;
+                    if (string.IsNullOrEmpty(st))
+                    {
+                        st = Guid.NewGuid().ToString();
+                    }
+                    return st;
+                }
+                else
+                {
+                    return _client_id;
+                } 
+            }
+            set { _client_id = value; }
+        }
+
         public async Task<bool> ConnectAsync()
         {
             var uri = BrokerUri;
@@ -125,25 +160,25 @@ namespace IoTSharp.MqttSdk
                 }
                 var factory = new MqttFactory();
                 Client = factory.CreateMqttClient();
+             
                 var clientOptions = new MqttClientOptionsBuilder()
-                       .WithClientId(uri.PathAndQuery)
+                       .WithClientId(ClientId)
                           .WithTcpServer(uri.Host, uri.Port)
-                        .WithCredentials(username, password)
+                        .WithCredentials(username, password).WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
                         .Build();
                 Client.ApplicationMessageReceivedAsync +=   Client_ApplicationMessageReceived;
                 Client.ConnectedAsync+=  Client_ConnectedAsync;
-                Client.DisconnectedAsync += async (MqttClientDisconnectedEventArgs e) =>
+                Client.DisconnectedAsync += (MqttClientDisconnectedEventArgs e) =>
                 {
                     try
                     {
                         _logger.LogWarning($"CONNECTING FAILED,{e.Reason}-{e.ReasonString}");
-                        Thread.Sleep(TimeSpan.FromSeconds(60));
-                        await Client.ConnectAsync(clientOptions);
                     }
                     catch (Exception exception)
                     {
                         _logger.LogError(exception, "CONNECTING FAILED");
                     }
+                    return Task.CompletedTask;
                 };
 
                 try
@@ -186,7 +221,6 @@ namespace IoTSharp.MqttSdk
 
         private async Task Client_ConnectedAsync(MqttClientConnectedEventArgs e)
         {
-
             await Client.SubscribeAsync($"devices/{DeviceId}/rpc/request/+/+");
             await Client.SubscribeAsync($"devices/{DeviceId}/attributes/update/", MqttQualityOfServiceLevel.ExactlyOnce);
             _logger.LogInformation($"CONNECTED WITH SERVER ");
